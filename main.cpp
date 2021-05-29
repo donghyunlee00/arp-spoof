@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
             else if (ntohs(eth_hdr->type_) == EthHdr::Arp)
             {
                 struct ArpHdr *arp_hdr = (struct ArpHdr *)(packet + sizeof(EthHdr));
-                if (ntohs(arp_hdr->op_) == ArpHdr::Request && ((ntohl(arp_hdr->sip_) == flow[i].sender_ip && ntohl(arp_hdr->tip_)) == flow[i].target_ip || ntohl(arp_hdr->sip_) == flow[i].target_ip))
+                if (ntohs(arp_hdr->op_) == ArpHdr::Request && ((ntohl(arp_hdr->sip_) == flow[i].sender_ip && ntohl(arp_hdr->tip_) == flow[i].target_ip) || ntohl(arp_hdr->sip_) == flow[i].target_ip))
                 {
                     if (arpInfect(handle, attacker_mac, flow[i].sender_ip, flow[i].sender_mac, flow[i].target_ip) == -1)
                     {
